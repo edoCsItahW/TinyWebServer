@@ -21,23 +21,13 @@
 #include <functional>
 
 #include "../net/socket.hpp"
-#include "event_data.hpp"
 #include "enums.hpp"
+#include "types.hpp"
 
 #undef ERROR
 
 
 namespace tiny_web_server::async {
-
-    template<typename T>
-    concept EventHandler = requires(T handler, socket_t fd, EventType data) {
-        { handler.onEvent(fd, data) } -> std::same_as<void>;
-        { handler.onError(fd, data) } -> std::same_as<void>;
-    };
-
-
-
-    using TaskHandler = std::move_only_function<void(std::expected<EventData, std::error_code>)>;
 
     struct ReactorConfig {
         std::size_t max_events{1024};

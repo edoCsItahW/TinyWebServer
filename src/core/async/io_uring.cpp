@@ -14,12 +14,15 @@
  * @copyright CC BY-NC-SA 2025. All rights reserved.
  * */
 #include "io_uring.hpp"
+#include "../../exception.hpp"
+
+#include <utility>
 
 namespace tiny_web_server::async::detail {
 
     IoUring::IoUring(std::size_t queueDepth, unsigned int flags) {
         if (io_uring_queue_init(static_cast<unsigned>(queueDepth), &ring_, flags) < 0)
-            throw net::SocketError(errno, "io_uring_queue_init failed");
+            throw exception::SocketError(errno, "io_uring_queue_init failed");
     }
 
     IoUring::~IoUring() { io_uring_queue_exit(&ring_); }
@@ -32,11 +35,11 @@ namespace tiny_web_server::async::detail {
 
     void IoUring::submit() {
         if (io_uring_submit(&ring_) < 0)
-            throw net::SocketError(errno, "io_uring_submit failed");
+            throw exception::SocketError(errno, "io_uring_submit failed");
     }
 
     bool IoUring::waitCqeTimeout(io_uring_cqe **cqe, std::chrono::nanoseconds timeout) {
-        __kernel_timespec ts{.tv_sec = timeout.count() / 1000, .tv_nsec = timeout.count() % 1000 * 1000000};
+        __kernel_timespec ts{.tv_sec = timeout.count() / 1000000000, .tv_nsec = timeout.count() % 1000000000};
 
         return io_uring_wait_cqe_timeout(&ring_, cqe, &ts) == 0;
     }

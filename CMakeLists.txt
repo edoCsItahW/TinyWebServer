@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 #file(GLOB HEADERS ./include/**/*.hpp)
 file(GLOB_RECURSE SOURCES ./src/**/*.cpp)
 
-add_executable(TinyWebServer main.cpp ${SOURCES} ${HEADERS})
+add_executable(TinyWebServer main.cpp ${SOURCES} ${HEADERS}
+        src/core/async/types.h)
 
 # target_link_libraries(MyTestExecutable PRIVATE ${Boost_LIBRARIES})
