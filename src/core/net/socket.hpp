@@ -341,7 +341,7 @@ namespace tiny_web_server::net {
         void swap(SocketHandle &other) noexcept;
 
     private:
-        static constexpr socket_t invalidSocket = INVALID_SOCKET;
+        static constexpr socket_t invalidSocket = NET_INVALID_SOCKET;
 
         socket_t handle_ = invalidSocket;
     };
