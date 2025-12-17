@@ -44,7 +44,10 @@ namespace tiny_web_server::async {
         if (static_cast<bool>(events & EventType::READ)) {
             auto operation = std::make_unique<detail::IoOperation>();
 
-            submitIocpRead(socket, /* buffer */, reinterpret_cast<std::uintptr_t>(operation.get()));
+            if (!operation)
+                throw exception::SocketError("Failed to allocate IoOperation");
+
+            submitIocpRead(socket, {}, reinterpret_cast<std::uintptr_t>(operation.get()));
 
             operations_[key] = std::move(operation);
         }
