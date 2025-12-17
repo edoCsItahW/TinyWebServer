@@ -15,6 +15,12 @@
  * */
 #include "reactor.hpp"
 
+#if WEB_SERVER_LINUX
+
+#include <utility>
+
+#endif
+
 
 namespace tiny_web_server::async {
 
@@ -113,7 +119,51 @@ namespace tiny_web_server::async {
 
 #else
 
+        IoUring::IoUring(std::size_t queueDepth, unsigned int flags) {
+            if (io_uring_queue_init(static_cast<unsigned>(queueDepth), &ring_, flags) < 0)
+                throw net::SocketError(errno, "io_uring_queue_init failed");
+        }
 
+        IoUring::~IoUring() { io_uring_queue_exit(&ring_); }
+
+        io_uring *IoUring::get() noexcept { return &ring_; }
+
+        const io_uring *IoUring::get() const noexcept { return &ring_; }
+
+        io_uring_sqe *IoUring::getSqe() noexcept { return io_uring_get_sqe(&ring_); }
+
+        void IoUring::submit() {
+            if (io_uring_submit(&ring_) < 0)
+                throw net::SocketError(errno, "io_uring_submit failed");
+        }
+
+        bool IoUring::waitCqeTimeout(io_uring_cqe **cqe, std::chrono::nanoseconds timeout) {
+            __kernel_timespec ts{.tv_sec = timeout.count() / 1000, .tv_nsec = timeout.count() % 1000 * 1000000};
+
+            return io_uring_wait_cqe_timeout(&ring_, cqe, &ts) == 0;
+        }
+
+        io_uring_cqe *IoUring::peekCqe() noexcept {
+            io_uring_cqe *cqe = nullptr;
+
+            io_uring_peek_cqe(&ring_, &cqe);
+
+            return cqe;
+        }
+
+        void IoUring::cqeSeen(io_uring_cqe *cqe) noexcept { io_uring_cqe_seen(&ring_, cqe); }
+
+        IoUring::IoUring(IoUring &&other) noexcept : ring_(std::exchange(other.ring_, {})) {}
+
+        IoUring &IoUring::operator=(IoUring &&other) noexcept {
+            if (this != &other) {
+                io_uring_queue_exit(&ring_);
+
+                ring_ = std::exchange(other.ring_, {});
+            }
+
+            return *this;
+        }
 
 #endif
 

@@ -182,7 +182,7 @@ namespace tiny_web_server::async {
 
         struct IoOperation {
             TaskHandler callback;
-            socket_t socket{INVALID_SOCKET};
+            socket_t socket{NET_INVALID_SOCKET};
             EventType eventType{EventType::READ};
             std::vector<std::byte> buffer;
             int res{0};

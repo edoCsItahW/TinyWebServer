@@ -208,7 +208,7 @@
      *
      * @endif
      */
-    #define NET_INVALID_SOCKET -1
+    #define NET_INVALID_SOCKET (-1)
 
     /** @typedef socket_t
      *
