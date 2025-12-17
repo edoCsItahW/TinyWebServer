@@ -16,6 +16,14 @@
 #ifndef TINY_WEB_SERVER_IO_URING_HPP
 #define TINY_WEB_SERVER_IO_URING_HPP
 #pragma once
+#include "../../platform.hpp"
+
+
+#if WEB_SERVER_LINUX
+#include <liburing/io_uring.h>
+#endif
+#include <chrono>
+#include "types.hpp"
 
 namespace tiny_web_server::async::detail {
 
