@@ -296,8 +296,7 @@ namespace tiny_web_server::async {
 
         DWORD bytesSent = 0;
 
-        if (WSASend(socket, &wsaBuf, 1, &bytesSent, 0, reinterpret_cast<LPOVERLAPPED>(operation), nullptr) ==
-            SOCKET_ERROR)
+        if (WSASend(socket, &wsaBuf, 1, &bytesSent, 0, operation, nullptr) == SOCKET_ERROR)
             if (auto error = WSAGetLastError(); error != WSA_IO_PENDING) {
                 operations_.erase(key);
 
@@ -320,33 +319,31 @@ namespace tiny_web_server::async {
     }
 
 #else
-    void Reactor::registerLinuxEvents(socket_t socket, EventType events, auto &&handler) {
-
-    }
+    void Reactor::registerLinuxEvents(socket_t socket, EventType events, auto &&handler) {}
 
     void Reactor::submitUringRead(socket_t socket, std::span<std::byte> buffer, std::uintptr_t key) {
-        auto* sqe = uring_.getSqe();
+        auto *sqe = uring_.getSqe();
 
         if (!sqe) {
             uring_.submit();
             sqe = uring_.getSqe();
         }
 
-        auto* operation = reinterpret_cast<detail::IoOperation*>(key);
+        auto *operation = reinterpret_cast<detail::IoOperation *>(key);
 
         io_uring_prep_read(sqe, socket, buffer.data(), buffer.size(), 0);
         io_uring_sqe_set_data(sqe, operation);
     }
 
     void Reactor::submitUringWrite(socket_t socket, std::span<const std::byte> data, std::uintptr_t key) {
-        auto* sqe = uring_.getSqe();
+        auto *sqe = uring_.getSqe();
 
         if (!sqe) {
             uring_.submit();
             sqe = uring_.getSqe();
         }
 
-        auto* operation = reinterpret_cast<detail::IoOperation*>(key);
+        auto *operation = reinterpret_cast<detail::IoOperation *>(key);
         operation->buffer.assign(data.begin(), data.end());
 
         io_uring_prep_write(sqe, socket, operation->buffer.data(), data.size(), 0);
@@ -354,7 +351,7 @@ namespace tiny_web_server::async {
     }
 
     void Reactor::processUringEvents() {
-        io_uring_cqe* cqe = nullptr;
+        io_uring_cqe *cqe = nullptr;
 
         if (uring_.waitCqeTimeout(&cqe, config_.timeout) && cqe) {
             if (auto *operation = static_cast<detail::IoOperation *>(io_uring_cqe_get_data(cqe))) {
@@ -370,12 +367,10 @@ namespace tiny_web_server::async {
 #endif
 
     void Reactor::handleCompletion(detail::IoOperation *operation, std::size_t bytesTransferred) {
-        EventData data{
-            .data = reinterpret_cast<void *>(operation->socket),
-            .bytesTransferred = bytesTransferred,
-            .errorCode = 0,
-            .eventType = operation->eventType
-        };
+        EventData data{.data = reinterpret_cast<void *>(operation->socket),
+                       .bytesTransferred = bytesTransferred,
+                       .errorCode = 0,
+                       .eventType = operation->eventType};
 
         if (operation->callback)
             operation->callback(data);

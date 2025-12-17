@@ -48,10 +48,27 @@
         #define WIN32_LEAN_AND_MEAN
     #endif
 
-    #include <mswsock.h>
+    #ifndef _WINSOCKAPI_
+        #define _WINSOCKAPI_
+    #endif
+
     #include <windows.h>
     #include <winsock2.h>
     #include <ws2tcpip.h>
+    #include <mswsock.h>
+
+    #ifdef __MINGW32__
+        #ifdef ULONG
+            using ULONG = unsigned long;
+        #endif
+        #ifndef ULONG_PTR
+            using ULONG_PTR = std::uintptr_t;
+        #endif
+        #ifdef DWORD_PTR
+            using DWORD_PTR = std::uintptr_t;
+        #endif
+
+    #endif
 
     #pragma comment(lib, "ws2_32.lib")
     #pragma comment(lib, "mswsock.lib")

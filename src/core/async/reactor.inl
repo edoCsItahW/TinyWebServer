@@ -28,12 +28,43 @@ namespace tiny_web_server::async {
             throw net::SocketError(GetLastError(), "IOCP associate failed");
 
         if (static_cast<bool>(events & EventType::READ))
-            submitRead(socket, key);
+            submitRead(socket, std::forward<Handler>(handler));
 
 #else
+        registerLinuxEvents(socket, events, std::forward<Handler>(handler));
 
 #endif
-        handlers_.emplace(socket, std::make_unique<Handler>(std::forward<Handler>(handler)));
+        handlers_.emplace(
+                socket, std::unique_ptr<void, void (*)(void *)>(new Handler(std::forward<Handler>(handler)),
+                                                                [](void *ptr) { delete static_cast<Handler *>(ptr); }));
+    }
+
+    template<EventHandler Handler>
+    void Reactor::submitRead(socket_t socket, Handler &&handler) {
+        auto operation = std::make_unique<detail::IoOperation>();
+
+        operation->socket = socket;
+        operation->eventType = EventType::READ;
+        operation->callback = [this, handler = std::forward<Handler>(handler)](
+                                      std::expected<EventData, std::error_code> result) mutable {
+            if (result)
+                handler.onEvent(result->data ? *static_cast<socket_t *>(result->data) : NET_INVALID_SOCKET, *result);
+
+            else
+                handler.onError(NET_INVALID_SOCKET, result.error().value());
+        };
+
+        auto key = reinterpret_cast<std::uintptr_t>(operation.get());
+
+        operations_.emplace(key, std::move(operation));
+
+#if WEB_SERVER_WINDOWS
+        submitIocpRead(socket, {}, key);
+
+#else
+        submitUringRead(socket, {}, key);
+
+#endif
     }
 
     template<EventHandler Handler>
@@ -45,8 +76,7 @@ namespace tiny_web_server::async {
         operation->callback = [this, handler = std::forward<Handler>(handler)](
                                       std::expected<EventData, std::error_code> result) mutable {
             if (result)
-                handler.onEvent(result->data ? *static_cast<socket_t *>(result->data) : NET_INVALID_SOCKET,
-                                *result);
+                handler.onEvent(result->data ? *static_cast<socket_t *>(result->data) : NET_INVALID_SOCKET, *result);
 
             else
                 handler.onError(NET_INVALID_SOCKET, result.error().value());
@@ -74,7 +104,8 @@ namespace tiny_web_server::async {
         operation->socket = socket;
         operation->eventType = EventType::WRITE;
         operation->buffer.assign(data.data(), data.data() + data.size());
-        operation->callback = [this, handler = std::forward<Handler>(handler)](std::expected<EventData, std::error_code> result) mutable {
+        operation->callback = [this, handler = std::forward<Handler>(handler)](
+                                      std::expected<EventData, std::error_code> result) mutable {
             if (result)
                 handler.onEvent(result->data ? *static_cast<socket_t *>(result->data) : NET_INVALID_SOCKET, *result);
 
@@ -99,11 +130,14 @@ namespace tiny_web_server::async {
 
     template<std::size_t I>
     auto Reactor::get() const {
-        if constexpr (I == 0) return config_;
+        if constexpr (I == 0)
+            return config_;
 
-        else if constexpr (I == 1) return isRunning();
+        else if constexpr (I == 1)
+            return isRunning();
 
-        else static_assert(I < 2, "Index out of range");
+        else
+            static_assert(I < 2, "Index out of range");
     }
 
 } // namespace tiny_web_server::async

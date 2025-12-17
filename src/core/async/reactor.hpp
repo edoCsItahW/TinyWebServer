@@ -220,6 +220,9 @@ namespace tiny_web_server::async {
         template<EventHandler Handler>
         Task asyncWrite(socket_t socket, std::span<const std::byte> data, Handler &&handler);
 
+        template<EventHandler Handler>
+        void submitRead(socket_t socket, Handler &&handler);
+
         void run();
 
         void stop() noexcept;
