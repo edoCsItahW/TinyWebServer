@@ -169,4 +169,155 @@ namespace tiny_web_server::async {
 
     } // namespace detail
 
+    Reactor::Reactor(ReactorConfig config) : config_(std::move(config)) { initialize(); }
+
+    Reactor::~Reactor() { stop(); }
+
+    Reactor::Reactor(Reactor &&other) noexcept :
+        config_(std::move(other.config_)), stopSource_(std::move(other.stopSource_)) {
+#if WEB_SERVER_WINDOWS
+        iocp_ = std::move(other.iocp_);
+
+#else
+        uring_ = std::move(other.uring_);
+
+#endif
+
+        operations_ = std::move(other.operations_);
+    }
+
+    Reactor &Reactor::operator=(Reactor &&other) noexcept {
+        if (this != &other) {
+            stop();
+
+            config_ = std::move(other.config_);
+
+            stopSource_ = std::move(other.stopSource_);
+
+#if WEB_SERVER_WINDOWS
+            iocp_ = std::move(other.iocp_);
+
+#else
+            uring_ = std::move(other.uring_);
+
+#endif
+            operations_ = std::move(other.operations_);
+        }
+
+        return *this;
+    }
+
+    void Reactor::unregisterSocket(socket_t socket) noexcept {
+        handlers_.erase(socket);
+
+#if WEB_SERVER_WINDOWS
+        CancelIoEx(reinterpret_cast<HANDLE>(socket), nullptr);
+
+#endif
+    }
+
+    void Reactor::run() {
+        running_.store(true, std::memory_order_release);
+
+        workers_.reserve(config_.thread_count);
+
+        for (std::size_t i{0}; i < config_.thread_count; ++i)
+            workers_.emplace_back([this, stopToken = stopSource_.get_token()] { eventLoop(stopToken); });
+    }
+
+    void Reactor::stop() noexcept {
+        if (!running_.exchange(false, std::memory_order_acq_rel))
+            return;
+
+        stopSource_.request_stop();
+
+#if WEB_SERVER_WINDOWS
+        for (std::size_t i{0}; i < workers_.size(); ++i)
+            iocp_.postQueuedCompletionStatus(0, 0, nullptr);
+#endif
+
+        for (auto &worker : workers_)
+            if (worker.joinable())
+                worker.join();
+
+        workers_.clear();
+        operations_.clear();
+        handlers_.clear();
+    }
+
+    bool Reactor::isRunning() const noexcept {
+        return running_.load(std::memory_order_acquire);
+    }
+
+    void Reactor::initialize() {
+#if WEB_SERVER_WINDOWS
+      iocp_ = detail::IoCompletionPort(config_.thread_count);
+
+#else
+
+#endif
+
+    }
+
+    void Reactor::eventLoop(std::stop_token stopToken) {
+        while (!stopToken.stop_requested() && running_.load(std::memory_order_acquire))
+#if WEB_SERVER_WINDOWS
+            processIocpEvents();
+
+#else
+
+#endif
+
+    }
+
+    void Reactor::submitIocpRead(socket_t socket, std::span<std::byte> buffer, std::uintptr_t key) {
+        auto* operation = reinterpret_cast<detail::IoOperation*>(key);
+
+        WSABUF wsaBuf{
+            .len = static_cast<ULONG>(buffer.size()),
+           .buf = reinterpret_cast<char*>(buffer.data())
+        };
+
+        DWORD flags = 0;
+        DWORD bytesReceived = 0;
+
+        if (WSARecv(socket, &wsaBuf, 1, &bytesReceived, &flags, reinterpret_cast<LPOVERLAPPED>(operation), nullptr) == SOCKET_ERROR)
+            if (auto error = WSAGetLastError(); error != WSA_IO_PENDING) {
+                operations_.erase(key);
+
+                throw net::SocketError(error, "WSARecv failed");
+            }
+    }
+
+    void Reactor::submitIocpWrite(socket_t socket, std::span<const std::byte> data, std::uintptr_t key) {
+        auto* operation = reinterpret_cast<detail::IoOperation*>(key);
+
+        WSABUF wsaBuf{
+            .len = static_cast<ULONG>(data.size()),
+           .buf = const_cast<char*>(reinterpret_cast<const char*>(data.data()))
+        };
+
+        DWORD bytesSent = 0;
+
+        if (WSASend(socket, &wsaBuf, 1, &bytesSent, 0, reinterpret_cast<LPOVERLAPPED>(operation), nullptr) == SOCKET_ERROR)
+            if (auto error = WSAGetLastError(); error != WSA_IO_PENDING) {
+                operations_.erase(key);
+
+                throw net::SocketError(error, "WSASend failed");
+            }
+    }
+
+    void Reactor::processIocpEvents() {
+        DWORD bytesTransferred = 0;
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED overlapped = nullptr;
+
+        if (iocp_.getQueuedCompletionStatus(&bytesTransferred, &completionKey, &overlapped, static_cast<DWORD>(config_.timeout.count())))
+            if (overlapped) {
+                auto* operation = reinterpret_cast<detail::IoOperation*>(overlapped);
+
+                handleCompletion(operation, bytesTransferred);
+            }
+    }
+
 } // namespace tiny_web_server::async

@@ -141,7 +141,7 @@ namespace tiny_web_server::async {
 
         struct IoOperation : OVERLAPPED {
             TaskHandler callback;
-            socket_t socket{INVALID_SOCKET};
+            socket_t socket{NET_INVALID_SOCKET};
             EventType eventType{EventType::READ};
             std::vector<std::byte> buffer;
 
@@ -195,7 +195,103 @@ namespace tiny_web_server::async {
 
     } // namespace detail
 
+    class Reactor {
+    public:
+        explicit Reactor(ReactorConfig config = {});
+
+        ~Reactor();
+
+        Reactor(const Reactor &) = delete;
+
+        Reactor &operator=(const Reactor &) = delete;
+
+        Reactor(Reactor &&other) noexcept;
+
+        Reactor &operator=(Reactor &&other) noexcept;
+
+        template<EventHandler Handler>
+        void registerSocket(socket_t socket, EventType events, Handler &&handler);
+
+        void unregisterSocket(socket_t socket) noexcept;
+
+        template<EventHandler Handler>
+        Task asyncRead(socket_t socket, std::span<std::byte> buffer, Handler &&handler);
+
+        template<EventHandler Handler>
+        Task asyncWrite(socket_t socket, std::span<const std::byte> data, Handler &&handler);
+
+        void run();
+
+        void stop() noexcept;
+
+        [[nodiscard]] bool isRunning() const noexcept;
+
+        template<std::size_t I>
+        auto get() const;
+
+    private:
+        void initialize();
+
+        void eventLoop(std::stop_token stopToken);
+
+#if WEB_SERVER_WINDOWS
+        void submitIocpRead(socket_t socket, std::span<std::byte> buffer, std::uintptr_t key);
+
+        void submitIocpWrite(socket_t socket, std::span<const std::byte> data, std::uintptr_t key);
+
+        void processIocpEvents();
+
+#elif WEB_SERVER_LINUX
+
+        void registerLinuxEvents(socket_t socket, EventType events, auto &&handler);
+
+        void submitUringRead(socket_t socket, std::span<std::byte> buffer, std::uintptr_t key);
+
+        void submitUringWrite(socket_t socket, std::span<const std::byte> data, std::uintptr_t key);
+
+        void processUringEvents();
+
+#endif
+
+        void handleCompletion(detail::IoOperation *operation, std::size_t bytesTransferred);
+
+        ReactorConfig config_;
+
+        std::atomic<bool> running_{false};
+
+        std::stop_source stopSource_;
+
+        std::vector<std::jthread> workers_;
+
+#if WEB_SERVER_WINDOWS
+        detail::IoCompletionPort iocp_;
+#elif WEB_SERVER_LINUX
+        detail::IoUring uring_;
+#endif
+
+        std::unordered_map<std::uintptr_t, std::unique_ptr<detail::IoOperation>> operations_;
+
+        std::unordered_map<socket_t, std::unique_ptr<void, void (*)(void *)>> handlers_;
+    };
+
 } // namespace tiny_web_server::async
 
+namespace std {
+    template<>
+    struct tuple_size<tiny_web_server::async::Reactor> : integral_constant<std::size_t, 2> {};
+
+    template<>
+    struct tuple_element<0, tiny_web_server::async::Reactor> {
+        using type = tiny_web_server::async::ReactorConfig;
+    };
+
+    template<>
+    struct tuple_element<1, tiny_web_server::async::Reactor> {
+        using type = bool;
+    };
+
+} // namespace std
+
+#include "reactor.inl"
 
 #endif // TINY_WEB_SERVER_REACTOR_HPP
