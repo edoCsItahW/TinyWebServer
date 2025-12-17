@@ -17,6 +17,20 @@
 #define TINY_WEB_SERVER_REACTOR_INL
 #pragma once
 
+#include "task.hpp"
+
+#include "../../exception.hpp"
+
+#if WEB_SERVER_WINDOWS
+
+    #include "io_completion_port.hpp"
+
+#else
+
+    #include "io_uring.hpp"
+
+#endif
+
 namespace tiny_web_server::async {
 
     template<EventHandler Handler>
@@ -25,10 +39,15 @@ namespace tiny_web_server::async {
 
 #if WEB_SERVER_WINDOWS
         if (!iocp_.associate(socket, key))
-            throw net::SocketError(GetLastError(), "IOCP associate failed");
+            throw exception::SocketError(GetLastError(), "IOCP associate failed");
 
-        if (static_cast<bool>(events & EventType::READ))
-            submitRead(socket, std::forward<Handler>(handler));
+        if (static_cast<bool>(events & EventType::READ)) {
+            auto operation = std::make_unique<detail::IoOperation>();
+
+            submitIocpRead(socket, /* buffer */, reinterpret_cast<std::uintptr_t>(operation.get()));
+
+            operations_[key] = std::move(operation);
+        }
 
 #else
         registerLinuxEvents(socket, events, std::forward<Handler>(handler));
