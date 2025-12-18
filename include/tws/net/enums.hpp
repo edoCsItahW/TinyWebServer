@@ -34,8 +34,15 @@ namespace tiny_web_server::net {
         IPv6 = AF_INET6,
         /// 红外地址族，对应AF_IRDA
         RDA = AF_IRDA,
-        /// 蓝牙地址族，对应AF_BTH
+        /**
+         * @brief 蓝牙地址族，对应AF_BTH或AF_BLUETOOTH
+         * @note 在windows系统中对应AF_BTH，在Linux系统中对应AF_BLUETOOTH
+         */
+        #if WEB_SERVER_WINDOWS
         BTH = AF_BTH
+        #else
+        BTH = AF_BLUETOOTH,
+        #endif
     };
 
     /** @enum SocketType
@@ -101,8 +108,11 @@ namespace tiny_web_server::net {
         /**
          * @brief PGM协议，对应IPPROTO_PGM
          * @details 用于可靠多播的PGM协议。 当af参数为AF_INET且类型参数为SOCK_RDM时，这是一个可能的值。 在针对Windows Vista及更高版本发布的Windows SDK上，此协议也称为IPPROTO_PGM。仅在安装了可靠多播协议时才支持此协议值。
+         * @note 仅在Windows Vista及更高版本的Windows SDK中受支持。
          */
+        #if WEB_SERVER_WINDOWS
         PGM = IPPROTO_PGM,
+        #endif
         /**
          * @brief 不指定协议
          * @details 调用者不希望指定协议，服务提供商将选择要使用的协议。

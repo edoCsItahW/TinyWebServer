@@ -82,6 +82,7 @@
     #include <arpa/inet.h>
     #include <fcntl.h>
     #include <netinet/in.h>
+    #include <netinet/tcp.h>
     #include <sys/epoll.h>
     #include <sys/socket.h>
     #include <unistd.h>
@@ -203,7 +204,7 @@
      *
      * @endif
      */
-    #define NET_CLOSE close
+    #define NET_CLOSE(...) close()
 
     /** @def NET_INVALID_SOCKET
      *

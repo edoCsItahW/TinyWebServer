@@ -16,6 +16,9 @@
 #include "tws/net/socket.hpp"
 #include "tws/exception.hpp"
 
+#if WEB_SERVER_LINUX
+#include <cstring>
+#endif
 
 namespace tiny_web_server::net {
 
@@ -28,14 +31,14 @@ namespace tiny_web_server::net {
             static_cast<int>(family), static_cast<int>(type), static_cast<int>(protocol)
         );
 
-        if (handle_ == INVALID_SOCKET) throw SocketError<"Failed to create socket"_s>();
+        if (handle_ == NET_INVALID_SOCKET) throw SocketError<"Failed to create socket"_s>();
     }
 
     Socket::~Socket() { close(); }
 
     Socket::Socket(Socket&& other) noexcept
         : handle_(other.handle_) {
-        other.handle_ = INVALID_SOCKET;
+        other.handle_ = NET_INVALID_SOCKET;
     }
 
     Socket& Socket::operator=(Socket&& other) noexcept {
@@ -43,7 +46,7 @@ namespace tiny_web_server::net {
             if (isValid()) NET_CLOSE(handle_);
 
             handle_       = other.handle_;
-            other.handle_ = INVALID_SOCKET;
+            other.handle_ = NET_INVALID_SOCKET;
         }
 
         return *this;
@@ -216,10 +219,10 @@ namespace tiny_web_server::net {
 
         if (isValid()) NET_CLOSE(handle_);
 
-        handle_ = INVALID_SOCKET;
+        handle_ = NET_INVALID_SOCKET;
     }
 
-    bool Socket::isValid() const { return handle_ != INVALID_SOCKET; }
+    bool Socket::isValid() const { return handle_ != NET_INVALID_SOCKET; }
 
     socket_t Socket::nativeHandle() const noexcept { return handle_; }
 

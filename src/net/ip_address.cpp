@@ -16,6 +16,10 @@
 #include "tws/net/ip_address.hpp"
 #include "tws/exception.hpp"
 
+#if WEB_SERVER_LINUX
+#include <cstring>
+#endif
+
 namespace tiny_web_server::net {
 
     IpAddress::IpAddress(const std::string_view str) {
