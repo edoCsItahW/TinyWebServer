@@ -42,7 +42,7 @@
 #if defined(_WIN32) || defined(_WIN64)
 
     #define WEB_SERVER_WINDOWS 1
-    #define WEB_SERVER_POSIX 0
+    #define WEB_SERVER_LINUX 0
 
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN
@@ -74,9 +74,9 @@
     #pragma comment(lib, "mswsock.lib")
 
 // Linux
-#elif defined(__unix__) || defined(__APPLE__) || defined(__unix__)
+#elif defined(__linux__)
 
-    #define WEB_SERVER_POSIX 1
+    #define WEB_SERVER_LINUX 1
     #define WEB_SERVER_WINDOWS 0
 
     #include <arpa/inet.h>
@@ -85,15 +85,7 @@
     #include <sys/epoll.h>
     #include <sys/socket.h>
     #include <unistd.h>
-
-    #ifdef __linux__
-        #define WEB_SERVER_LINUX 1
-        #include <liburing.h>
-
-    #else
-        #define WEB_SERVER_LINUX 0
-
-    #endif
+    #include <liburing.h>
 
 #else
 
