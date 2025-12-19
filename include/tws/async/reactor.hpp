@@ -48,6 +48,12 @@ namespace tiny_web_server::async {
         Task<void> asyncConnect(net::Socket& socket, const net::Endpoint& endpoint);
 
         friend struct AcceptOperation;
+
+        friend struct RecvOperation;
+
+        friend struct SendOperation;
+
+        friend struct ConnectOperation;
     };
 
 }  // namespace tiny_web_server::async

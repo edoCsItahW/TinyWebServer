@@ -14,8 +14,15 @@
  * @copyright CC BY-NC-SA 2025. All rights reserved.
  * */
 #include "tws/async/reactor.hpp"
-#include "tws/async/reactor_io_uring.hpp"
-#include "tws/async/reactor_iocp.hpp"
+
+#if WEB_SERVER_WINDOWS
+    #include "tws/async/reactor_iocp.hpp"
+#elif WEB_SERVER_LINUX
+    #include "tws/async/reactor_io_uring.hpp"
+#else
+    #error "Unsupported platform"
+#endif
+
 #include <cstring>
 
 namespace tiny_web_server::async {
@@ -24,7 +31,8 @@ namespace tiny_web_server::async {
 #if WEB_SERVER_WINDOWS
 
 
-    Reactor::Reactor() : impl_(std::make_unique<Impl>()) {  }
+    Reactor::Reactor()
+        : impl_(std::make_unique<Impl>()) {}
 
     Reactor::~Reactor() = default;
 
@@ -87,7 +95,10 @@ namespace tiny_web_server::async {
         sockaddr_in clientAddr{};
         socklen_t clientAddrLen = sizeof(clientAddr);
 
-        impl_->submitAccept(listener.nativeHandle(), reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen, op);
+        impl_->submitAccept(
+            listener.nativeHandle(), reinterpret_cast<sockaddr*>(&clientAddr),
+            &clientAddrLen, op
+        );
 
         co_await std::suspend_always{};
 
@@ -155,12 +166,14 @@ namespace tiny_web_server::async {
 
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(endpoint.port());
+        addr.sin_port   = htons(endpoint.port());
 
         auto addressBytes = endpoint.address().toBytes();
         std::memcpy(&addr.sin_addr, addressBytes.data(), 4);
 
-        impl_->submitConnect(socket.nativeHandle(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr), op);
+        impl_->submitConnect(
+            socket.nativeHandle(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr), op
+        );
 
         co_await std::suspend_always{};
 
