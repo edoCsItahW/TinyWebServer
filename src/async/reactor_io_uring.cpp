@@ -15,6 +15,8 @@
  * */
 #include "tws/async/reactor_io_uring.hpp"
 
+#if WEB_SERVER_LINUX
+
 namespace tiny_web_server::async {
 
     Reactor::Impl::Impl() {
@@ -112,3 +114,5 @@ namespace tiny_web_server::async {
         : endpoint(endpoint) {}
 
 }  // namespace tiny_web_server::async
+
+#endif  // WEB_SERVER_LINUX

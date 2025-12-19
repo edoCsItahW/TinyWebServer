@@ -75,9 +75,7 @@ namespace tiny_web_server::async {
         return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
     }
 
-    inline void Task<void>::promise_type::return_void() noexcept {
-        this->result.emplace<1>();
-    }
+    inline void Task<void>::promise_type::return_void() noexcept {}
 
     inline bool Task<void>::Awaiter::await_ready() const noexcept { return false; }
 

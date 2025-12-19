@@ -41,8 +41,20 @@ namespace tiny_web_server::async {
         virtual Task<T> get_return_object() noexcept = 0;
     };
 
+    template<>
+    struct Promise<void> {
+        std::coroutine_handle<> continuation;
+        std::variant<std::monostate, std::exception_ptr> result;
+
+        auto initial_suspend() noexcept;
+
+        auto final_suspend() noexcept;
+
+        void unhandled_exception() noexcept;
+    };
+
 }  // namespace tiny_web_server::async
 
-#include "promise.inl"
+// #include "promise.inl"
 
 #endif  // TEST_TINY_WEB_SERVER_PROMISE_HPP

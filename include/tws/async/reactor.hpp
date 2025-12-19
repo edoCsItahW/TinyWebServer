@@ -46,6 +46,8 @@ namespace tiny_web_server::async {
         Task<std::size_t> asyncSend(net::Socket& socket, std::span<const std::byte> data);
 
         Task<void> asyncConnect(net::Socket& socket, const net::Endpoint& endpoint);
+
+        friend struct AcceptOperation;
     };
 
 }  // namespace tiny_web_server::async
