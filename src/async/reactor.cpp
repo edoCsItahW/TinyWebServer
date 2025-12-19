@@ -14,7 +14,9 @@
  * @copyright CC BY-NC-SA 2025. All rights reserved.
  * */
 #include "tws/async/reactor.hpp"
+#include "tws/async/reactor_io_uring.hpp"
 #include "tws/async/reactor_iocp.hpp"
+#include <cstring>
 
 namespace tiny_web_server::async {
 
@@ -63,6 +65,112 @@ namespace tiny_web_server::async {
     }
 
 #elif WEB_SERVER_LINUX
+
+
+    Reactor::Reactor()
+        : impl_(std::make_unique<Impl>()) {}
+
+    Reactor::~Reactor() = default;
+
+    void Reactor::run() { impl_->workerThread.join(); }
+
+    void Reactor::stop() { impl_->running = false; }
+
+    Task<net::Socket> Reactor::asyncAccept(net::Socket& listener) {
+        auto op = impl_->createOperation<AcceptOperation>(&listener);
+
+        op->handle = std::coroutine_handle<>::from_address(co_await std::suspend_always{});
+
+        sockaddr_in clientAddr{};
+        socklen_t clientAddrLen = sizeof(clientAddr);
+
+        impl_->submitAccept(listener.nativeHandle(), reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen, op);
+
+        co_await std::suspend_always{};
+
+        if (op->result < 0) {
+            impl_->destroyOperation(op);
+
+            throw std::system_error(-op->result, std::system_category(), "Accept failed");
+        }
+
+        net::Socket socket(static_cast<socket_t>(op->result));
+        impl_->destroyOperation(op);
+
+        co_await socket;
+    }
+
+    Task<std::vector<std::byte>> Reactor::asyncRecv(net::Socket& socket, std::size_t size) {
+        auto op = impl_->createOperation<RecvOperation>(size);
+
+        op->handle = std::coroutine_handle<>::from_address(co_await std::suspend_always{});
+
+        impl_->submitRecv(socket.nativeHandle(), op->buffer.data(), op->buffer.size(), op);
+
+        co_await std::suspend_always{};
+
+        if (op->result < 0) {
+            impl_->destroyOperation(op);
+
+            throw std::system_error(-op->result, std::system_category(), "Recv failed");
+        }
+
+        op->buffer.resize(op->result);
+        auto result = std::move(op->buffer);
+        impl_->destroyOperation(op);
+
+        co_await result;
+    }
+
+    Task<std::size_t> Reactor::asyncSend(
+        net::Socket& socket, std::span<const std::byte> data
+    ) {
+        auto op = impl_->createOperation<SendOperation>(data);
+
+        op->handle = std::coroutine_handle<>::from_address(co_await std::suspend_always{});
+
+        impl_->submitSend(socket.nativeHandle(), op->data.data(), op->data.size(), op);
+
+        co_await std::suspend_always{};
+
+        if (op->result < 0) {
+            impl_->destroyOperation(op);
+
+            throw std::system_error(-op->result, std::system_category(), "Send failed");
+        }
+
+        auto bytesSent = static_cast<std::size_t>(op->result);
+        impl_->destroyOperation(op);
+
+        co_await bytesSent;
+    }
+
+    Task<void> Reactor::asyncConnect(net::Socket& socket, const net::Endpoint& endpoint) {
+        auto op = impl_->createOperation<ConnectOperation>(endpoint);
+
+        op->handle = std::coroutine_handle<>::from_address(co_await std::suspend_always{});
+
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(endpoint.port());
+
+        auto addressBytes = endpoint.address().toBytes();
+        std::memcpy(&addr.sin_addr, addressBytes.data(), 4);
+
+        impl_->submitConnect(socket.nativeHandle(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr), op);
+
+        co_await std::suspend_always{};
+
+        if (op->result < 0) {
+            impl_->destroyOperation(op);
+
+            throw std::system_error(-op->result, std::system_category(), "Connect failed");
+        }
+
+        impl_->destroyOperation(op);
+
+        co_return;
+    }
 
 #else
 
