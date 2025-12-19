@@ -41,7 +41,7 @@ namespace tiny_web_server::async {
 
         Task<net::Socket> asyncAccept(net::Socket& listener);
 
-        Task<std::vector<std::byte>> asyncRead(net::Socket& socket, std::size_t size);
+        Task<std::vector<std::byte>> asyncRecv(net::Socket& socket, std::size_t size);
 
         Task<std::size_t> asyncSend(net::Socket& socket, std::span<const std::byte> data);
 

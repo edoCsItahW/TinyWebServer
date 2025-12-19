@@ -22,6 +22,7 @@
 #if WEB_SERVER_LINUX
 
     #include "reactor.hpp"
+    #include "reactor_io_uring.hpp"
     #include <functional>
     #include <memory_resource>
     #include <mutex>
@@ -78,7 +79,37 @@ namespace tiny_web_server::async {
         );
     };
 
+    struct AcceptOperation : Reactor::Impl::Operation {
+
+        net::Socket* listener;
+
+        AcceptOperation(net::Socket* listener);
+
+    };
+
+    struct RecvOperation : Reactor::Impl::Operation {
+
+        std::vector<std::byte> buffer;
+
+        RecvOperation(std::size_t size);
+
+    };
+
+    struct SendOperation : Reactor::Impl::Operation {
+        std::vector<std::byte> data;
+
+        SendOperation(std::span<const std::byte> data);
+    };
+
+    struct ConnectOperation : Reactor::Impl::Operation {
+        net::Endpoint endpoint;
+
+        ConnectOperation(const net::Endpoint& endpoint);
+    };
+
 }  // namespace tiny_web_server::async
+
+#include "reactor_io_uring.inl"
 
 #endif  // WEB_SERVER_LINUX
 
