@@ -35,19 +35,20 @@ namespace tiny_web_server::async {
 
         PostQueuedCompletionStatus(iocpHandle, 0, 0, nullptr);
 
-        if (workerThread.joinable())
-            workerThread.join();
+        if (workerThread.joinable()) workerThread.join();
 
         CloseHandle(iocpHandle);
     }
 
     void Reactor::Impl::runIOCP() {
         while (running) {
-            DWORD bytesTransferred = 0;
+            DWORD bytesTransferred  = 0;
             ULONG_PTR completionKey = 0;
             LPOVERLAPPED overlapped = nullptr;
 
-            BOOL result = GetQueuedCompletionStatus(iocpHandle, &bytesTransferred, &completionKey, &overlapped, INFINITE);
+            BOOL result = GetQueuedCompletionStatus(
+                iocpHandle, &bytesTransferred, &completionKey, &overlapped, INFINITE
+            );
 
             if (!result) break;
 
@@ -56,11 +57,9 @@ namespace tiny_web_server::async {
 
                 op->bytesTransferred = bytesTransferred;
 
-                if (op->handle)
-                    op->handle.resume();
+                if (op->handle) op->handle.resume();
 
-                if (op->cleanup)
-                    op->cleanup();
+                if (op->cleanup) op->cleanup();
             }
         }
     }
@@ -69,6 +68,12 @@ namespace tiny_web_server::async {
         operation->~Operation();
 
         memoryPool.deallocate(operation, sizeof(*operation), alignof(*operation));
+    }
+
+    AcceptOperation::AcceptOperation(net::Socket* listener, net::Socket* acceptedSocket)
+        : listener(listener)
+        , acceptedSocket(acceptedSocket) {
+        std::memset(&overlapped, 0, sizeof(overlapped));
     }
 
 }  // namespace tiny_web_server::async

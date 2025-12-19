@@ -87,7 +87,7 @@ namespace tiny_web_server::async {
     struct Task<void>::Awaiter {
         std::coroutine_handle<promise_type> handle;
 
-        bool await_ready() const noexcept;
+        [[nodiscard]] bool await_ready() const noexcept;
 
         std::coroutine_handle<promise_type> await_suspend(
             std::coroutine_handle<> awaiting

@@ -22,6 +22,10 @@ namespace tiny_web_server::async {
 #if WEB_SERVER_WINDOWS
 
 
+    Reactor::Reactor() : impl_(std::make_unique<Impl>()) {  }
+
+    Reactor::~Reactor() = default;
+
     void Reactor::run() { impl_->workerThread.join(); }
 
     void Reactor::stop() {
@@ -47,7 +51,6 @@ namespace tiny_web_server::async {
             sizeof(op->client_addr) + 16, sizeof(op->client_addr) + 16, &bytes_received,
             &op->overlapped
         );
-
         if (!result && GetLastError() != ERROR_IO_PENDING) {
             impl_->destroyOperation(op);
             throw std::system_error(

@@ -27,7 +27,7 @@ namespace tiny_web_server::async {
     template<typename T>
     auto Promise<T>::final_suspend() noexcept {
         struct Awaiter {
-            bool await_ready() const noexcept { return false; }
+            [[nodiscard]] bool await_ready() const noexcept { return false; }
 
             std::coroutine_handle<> await_suspend(
                 std::coroutine_handle<Promise> coroutine
